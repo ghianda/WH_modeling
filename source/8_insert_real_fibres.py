@@ -42,7 +42,8 @@ def main(parser):
     mesh_basename = args.mesh_basename[0]
     R_filename    = args.R_filename[0]
     base_path     = args.base_path
-    _vpts = args.vpts  # bool
+    _vpts         = args.vpts  # bool -> if true, generate also the .vpts and .vec files of vectors
+    _empty_fiber  = args.empty_fiber  # bool -> if true, missing real fibers will be empty, otherwise use the rule-based
 
     print(BC.WARNING + '*** Filling mesh {} with real fibers ...'.format(mesh_basename) + BC.ENDC)
 
@@ -152,7 +153,7 @@ def main(parser):
     print('Saved in cpts_Rspace, list of {} tuple of ({}) elements'.format(len(cpts_Rspace), cpts_Rspace[0].shape))
     print('[INT PIXEL] Max rounded coordinates of centroids (XYZ) in R px space: ({}, {}, {})'.format(
         max(cpts_Rspace[:, 0]), max(cpts_Rspace[:, 1]), max(cpts_Rspace[:, 2])))
-    print('Type(cpts_Rspace[:, 0]): ', type(cpts_Rspace[:, 0]))
+    # print('Type(cpts_Rspace[:, 0]): ', type(cpts_Rspace[:, 0]))
 
     # Defines a copy of the fibre file to edit
     # I will create three different .lon files, for fibers, sheets and perp
@@ -169,10 +170,16 @@ def main(parser):
     exception   = 0  # count exception while insert fibers
     empty       = 0  # count mesh elements where there is empty real fiber 
     ev_xyz      = np.ndarray(3)  # temp array of real fiber vector
-    fake_vector = np.array([0.01, 0.01, 0.01])  # fake vector used for 'sheet' and 'perp' if the real-one is empty
+    empty_fiber = np.array([0.0, 0.0, 0.0])  # fake empty fiber used if real-one is empty, and for 'sheet' and 'perp'
     # NB -> I will insert the rule-based fiber where the real-one is empty
 
-    print(BC.BLUE + '*** Start compiling real fibers inside the new .lon file... ' + BC.ENDC)
+    print(BC.BLUE + 'Start compiling real fibers inside the new .lon file. ' + BC.ENDC)
+    if _empty_fiber:
+        print(BC.BLUE + '[Missing fibers will be EMPTY]' + BC.ENDC)
+    else:
+        print(BC.BLUE + '[Missing fibers will be replaced by the rule-based fiber (from the existent .lon file)]' + BC.ENDC)
+    print("Progress:")
+
     for i in range(n_points):
         # print progress percent
         if i % 10**(magn - 1) == 0:
@@ -186,19 +193,23 @@ def main(parser):
         # try to find the correspondent chunk in R of the current element centroid
         # check real fiber in this voxel
         if ~np.any(fibres_YXZ[y, x, z]):
-            # real fiber is empty, i use the theoretical one
-            lon_real.loc[i]   = lon_rb.loc[i]
-            lon_sheets.loc[i] = fake_vector
-            lon_perp.loc[i]   = fake_vector
+            # real fiber is empty
             empty = empty + 1
+
+            # empty sheet and perp
+            lon_sheets.loc[i] = empty_fiber
+            lon_perp.loc[i] = empty_fiber
+
+            # fill the fiber orientation based on user selection (empty or rule-based):
+            lon_real.loc[i] = empty_fiber if _empty_fiber else lon_rb.loc[i]
 
         else:
             # insert real data
             try:
                 # collect real fiber components by the matrix
-                ev_xyz[0] = fibres_YXZ[y, x, z, 1]
-                ev_xyz[1] = fibres_YXZ[y, x, z, 0]
-                ev_xyz[2] = fibres_YXZ[y, x, z, 2]
+                ev_xyz[0] = fibres_YXZ[y, x, z, 1]  # x
+                ev_xyz[1] = fibres_YXZ[y, x, z, 0]  # y
+                ev_xyz[2] = fibres_YXZ[y, x, z, 2]  # z
 
                 # assign congruent direction of my real fibers
                 # by scalar product between theoretical and real fibers:
@@ -225,6 +236,8 @@ def main(parser):
                 print('i={} - position: (x, y, z) = ({},{},{})'.format(i, x, y, z))
                 print(BC.ENDC)
                 exception = exception + 1
+
+    print(BC.BLUE + 'Terminated.' + BC.ENDC)
 
     # percentage of real fibers detected for the entire mesh:
     fiber_accuracy = 100 * (1  - (empty / n_points))
@@ -330,5 +343,10 @@ if __name__ == '__main__':
                            dest='vpts',
                            help='Add \'-v\' if you want to save the new fibers also in a .vec and .vpts files '
                                 'for meshalyzer visualization.')
+    my_parser.add_argument('-e',
+                           action='store_true',
+                           default=False,
+                           dest='empty_fiber',
+                           help='If real fiber is missing, write an empty fiber, otherwise replace with the existent .lon file (rule-based)')
 
     main(my_parser)
