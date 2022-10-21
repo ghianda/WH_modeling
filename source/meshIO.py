@@ -179,7 +179,8 @@ def read_lon(basename=None, file_lon=None):
     if file_lon is None:
         file_lon = glob.glob(basename + '*.lon')
         if len(file_lon) > 1:
-            raise ValueError('Too many matching .lon files')
+            print('*** - Too many matching .lon files. Loading the default one: {} *** '.format(basename + '.lon'))
+            file_lon = [basename + '.lon']
         elif len(file_lon) == 0:
             raise ValueError('No matching .lon files')
         file_lon = file_lon[0]
