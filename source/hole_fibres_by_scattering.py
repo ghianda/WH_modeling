@@ -170,8 +170,8 @@ def main(parser):
         scattering_yxz = ndimage.zoom(scattering_yxz, zoom=1 / mesh2scatt_res_ratio, prefilter=False)
 
         # save it in a new tiff file for the future
-        tiff.imwrite(file=os.path.join(base_path, "phantom_scatt_ds.tif"),
-                     data=np.moveaxis(scattering_yxz, -1, 0).astype(np.uint8))
+        phantom_ds_filepath = os.path.join(base_path, "phantom_scatt_ds.tif")
+        tiff.imwrite(phantom_ds_filepath, np.moveaxis(scattering_yxz, -1, 0).astype(np.uint8))
         print('Scattering channel scaled to the mesh resolution and saved as: phantom_scatt_ds.tif')
 
     # check dimension
