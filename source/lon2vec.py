@@ -107,8 +107,9 @@ def main(parser):
 
     print(BC.B + ' *** Generation of .vpts and .vec file for visualization...' + BC.ENDC)
     # define new filenames of .vec and .vpts
-    vec_filepath = mesh_basepath + '.vec'  # -> ci inserirò le componenti dei vettori (componenti)
-    vpts_filepath = mesh_basepath + '.vpts'  # -> ci inserirò le coordinate dei cpts  (posizioni)
+    lon_filepath_without_ext = os.path.splitext(lon_filepath)[0]
+    vec_filepath = lon_filepath_without_ext + '.vec'  # -> ci inserirò le componenti dei vettori (componenti)
+    vpts_filepath = lon_filepath_without_ext + '.vpts'  # -> ci inserirò le coordinate dei cpts  (posizioni)
 
     # scale the number of centroids
     scaled_cpts = cpts.loc[0:len(cpts):scale]
@@ -119,7 +120,7 @@ def main(parser):
 
     # add in the first line of .vpts file the number of selected centroids
     prepend_line(str(len(scaled_cpts)), vpts_filepath)
-    print('Saved selected centroids in:\n', vpts_filepath)
+    print('Saved selected centroids in:\n -', vpts_filepath)
 
     # scale the number of vectors
     scaled_vec = lon.loc[0:len(lon):scale].copy()
