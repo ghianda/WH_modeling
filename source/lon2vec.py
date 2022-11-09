@@ -160,8 +160,9 @@ if __name__ == '__main__':
                            default=100)
     my_parser.add_argument('-c',
                            '--color-component',
-                           help='Axis to use as color (default = 2)]. Accepted 0, 1, or 2',
+                           help='Axis to use as color (default = 1 = y)]. Accepted 0, 1, or 2',
                            required=False,
-                           default=2)
+                           type=int,
+                           default=1)
 
     main(my_parser)

@@ -93,7 +93,7 @@ def main(parser):
     out_name      = args.out_name
     _vtk          = args.vtk
 
-    print(BC.Y + '*** Modelling Fibrosis on mesh {} by holes in fibers ...'.format(mesh_basename) + BC.ENDC)
+    print(BC.Y + '*** Retagging elements in the mesh {} *** '.format(mesh_basename) + BC.ENDC)
 
     # directory of mesh files (if None, take the current directory)
     base_path = base_path if base_path is not None else os.getcwd()
@@ -112,8 +112,8 @@ def main(parser):
     elem_retagged = elem.copy()
 
     # create a backup of the old elem file (the new one will be overwritten)
-    os.system('cd {0} && cp {1}.elem {1}.backup_from_retag'.format(base_path, mesh_basename))
-    print('Backup of the .elem file created as: {}.backup_from_retag'.format(mesh_basename))
+    os.system('cd {0} && cp {1}.elem {1}.backup_before_retag'.format(base_path, mesh_basename))
+    print('Backup of the .elem file created as: {}.backup_before_retag'.format(mesh_basename))
 
     # ================================  PRE-ITERATION OPERATIONS  ==========================================
 
@@ -195,9 +195,10 @@ def main(parser):
         print("\n\n", file=f)
 
     # ======================== SAVE AS VTK =============================================
-    print(BC.B + "*** Generation of the mesh in VTK format collecting the new .elem file" + BC.ENDC)
-    os.system('cd {0} && meshtool convert -imsh={1} -ifmt=carp_txt '
-              '-omsh={1}_rettaged_as_{2}.vtk -ofmt=vtk_bin'.format(base_path, mesh_basename, final_tag))
+    if _vtk:
+        print(BC.B + "*** Generation of the mesh in VTK format collecting the new .elem file" + BC.ENDC)
+        os.system('cd {0} && meshtool convert -imsh={1} -ifmt=carp_txt '
+                  '-omsh={1}_rettaged_as_{2}.vtk -ofmt=vtk_bin'.format(base_path, mesh_basename, final_tag))
 
     # =============================================== END OF MAIN =========================================
     print(BC.Y + "*** retag.py terminated." + BC.ENDC)
