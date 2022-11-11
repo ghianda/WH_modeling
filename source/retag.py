@@ -230,7 +230,9 @@ if __name__ == '__main__':
                            type=int)
     my_parser.add_argument('-o',
                            '--out-name',
-                           help='Filename of the new .elem file (if not passed, default: MESHNAME_retagged.elem',
+                           help='Filename of the new .elem file (if not passed, it creates a backup of the old one \n'
+                                ' as MESHNAME.backup_before_retag and then overwrite the .elem file)'
+                                '\n ',
                            required=False)
     my_parser.add_argument('-vtk',
                            action='store_true',
