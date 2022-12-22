@@ -43,6 +43,7 @@ def main(parser):
     mesh_basename   = args.mesh_basename
     R_filename      = args.R_filename
     base_path       = args.base_path
+    _scaled         = args.scaled  # if True, the mesh is already scaled with a pixel size of 20um
     fiber_direction = args.fiber_direction  # if passed, fiber will be realigned along this direction (not using rule-based)
     _vpts           = args.vpts  # bool -> if true, generate also the .vpts and .vec files of vectors
     _empty_fiber    = args.empty_fiber  # bool -> if true, missing real fibers will be empty, otherwise use the rule-based
@@ -134,7 +135,12 @@ def main(parser):
     print('Resolution of the orientation analysis (r,c,z)', grane_yxz, 'px')
 
     # defines pixel size of the mesh (from the segmentation)
-    mesh_ps_yxz = np.array([20, 20, 20])  # um
+    if _scaled:
+        # the points in the mesh are already "scaled" with a pixel size of 20um - no need rescaling
+        mesh_ps_yxz = np.array([1, 1, 1])  # [um] -> points values are already in um
+    else:
+        # the points coordinates have to be rescaled with a pixel size of 20um
+        mesh_ps_yxz = np.array([20, 20, 20])  # um
     print('Resolution of the mesh (r,c,z)', mesh_ps_yxz, 'um')
 
     # calculate R pixel size (the resolution of the fibres)
@@ -383,6 +389,12 @@ if __name__ == '__main__':
                            help='pass the folder path of mesh files if files are not in the current directory',
                            required=False,
                            default=None)
+    my_parser.add_argument('-s',
+                           action='store_true',
+                           default=False,
+                           dest='scaled',
+                           help='Add \'-s\' if the mesh points (and centroids) are already scaled with the pixel size'
+                                '(default pixel size: ps=20)')
     my_parser.add_argument('-v',
                            action='store_true',
                            default=True,

@@ -1,13 +1,7 @@
 import os
 import argparse
-import numpy as np
 import math
 import meshIO as meshIO
-from datetime import date
-import tifffile as tiff
-from scipy import ndimage
-import subprocess
-
 from skimage.morphology._skeletonize_3d_cy import fill_Euler_LUT
 
 
