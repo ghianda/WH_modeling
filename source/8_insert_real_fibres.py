@@ -296,12 +296,28 @@ def main(parser):
     # percentage of real fibers detected for the entire mesh:
     fiber_accuracy = 100 * (1  - (empty / n_points))
 
-    # write results
+    # write results---------------------------------------------------------------
     string_lines = list()
     string_lines.append('*** Successfully filled the real fibers on {} total elements, with:'.format(n_points))
-    string_lines.append('-- {} elements where real fiber was empty -> filled with rule-based ones'.format(empty))
-    string_lines.append('-- {} elements where the fiber isn\'t empty but an exception is occured while compile new .lon files'.format(exception))
+    if _empty_fiber is True:
+        string_lines.append('-- {} elements where real fiber was empty -> they will be EMPTY '
+                            '(from the existent .lon file)'.format(empty))
+    if _fake_fiber is True:
+        string_lines.append('-- {} elements where real fiber was empty -> replaced by a fake fiber oriented as {}'.
+                            format(empty, fiber_direction))
+    if _empty_fiber is False and _fake_fiber is False:
+        string_lines.append('-- {} elements where real fiber was empty -> filled with rule-based ones '
+                            '(from the existent .lon file)'.format(empty))
+    string_lines.append(
+        '-- {} elements where the fiber isn\'t empty but an exception is occured while compile new .lon files'.format(
+            exception))
     string_lines.append('*** Percentage of real fibers in the mesh: {0:3.2f}%'.format(fiber_accuracy))
+
+    if fiber_dir_vec is not None:
+        string_lines.append(' -- Fibers versus will be realigned with axis {}: v=({},{},{})'.
+                            format(fiber_direction, fiber_dir_vec[0], fiber_dir_vec[1], fiber_dir_vec[2]))
+    else:
+        string_lines.append(' -- Fiber versus will be realigned using rule-based fibers')
 
     with open(txt_fpath, "a") as f:
         for line in string_lines:
