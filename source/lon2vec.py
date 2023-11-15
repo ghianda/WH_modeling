@@ -106,10 +106,13 @@ def main(parser):
     # ================================  GENERATE .VPTS and .VEC FILES =======================================
 
     print(BC.B + ' *** Generation of .vpts and .vec file for visualization...' + BC.ENDC)
-    # define new filenames of .vec and .vpts
+    # define new filenames of .vec and .vpts (output)
     lon_filepath_without_ext = os.path.splitext(lon_filepath)[0]
-    vec_filepath = lon_filepath_without_ext + '.vec'  # -> ci inserirò le componenti dei vettori (componenti)
-    vpts_filepath = lon_filepath_without_ext + '.vpts'  # -> ci inserirò le coordinate dei cpts  (posizioni)
+    # add the used scale in the output filename
+    out_lon_filepath_without_ext = lon_filepath_without_ext + "_scale{}".format(scale)
+    print("outputs will be saved as: {}\n".format(out_lon_filepath_without_ext))
+    vec_filepath = out_lon_filepath_without_ext + '.vec'  # -> ci inserirò le componenti dei vettori (componenti)
+    vpts_filepath = out_lon_filepath_without_ext + '.vpts'  # -> ci inserirò le coordinate dei cpts  (posizioni)
 
     # scale the number of centroids
     scaled_cpts = cpts.loc[0:len(cpts):scale]

@@ -82,7 +82,7 @@ def read_carp_mesh(mesh_basepath, lon_fpath=None, _read_cpts=False, _verb=True):
 
 def normalize_scatt(scatt_ldg, df_scatt_lvls):
     # normalize scattering from [4,... ,9] -> [3,... ,10] -> [0, 1]
-    # perchè [4, 9] sono cmq valori di fibrosi, quindi gli "estremi" sono 3 (fib al 0%) e 10 ( fib al 100%)
+    # because [4, 9] are INCLUDED into the diffuse fibrosis, so the "extremes" are ldg=3 (fib 0%, background) and ldg=10 (fibrosis 100% i.e. compact)
     min = np.min(df_scatt_lvls) - 1
     max = np.max(df_scatt_lvls) + 1
     normalized = (scatt_ldg - min) / (max - min)
@@ -120,7 +120,7 @@ def main(parser):
     lon_file            = args.lon_file
     _scatt_already_ds   = args.scatt_already_ds
     _vpts               = args.vpts
-    _vtk               = args.vtk
+    _vtk                = args.vtk
 
     # directory of mesh files (if None, take the current directory)
     base_path = base_path if base_path is not None else os.getcwd()
@@ -142,20 +142,20 @@ def main(parser):
     # loading mesh in carp format
     pts, elem, lon, cpts = read_carp_mesh(mesh_basepath, lon_fpath=lon_fpath, _read_cpts=True, _verb=True)
 
-    # defines pixel size of the mesh (from the segmentation)
+    # defines pixel size of the mesh (from the segmented image)
     mesh_ps_yxz = np.array([20, 20, 20])  # um
     print('Resolution of the mesh (r,c,z)', mesh_ps_yxz, 'um')
 
     # load scattering tiff
-    scattering_yxz = tiff.imread(scattering_tiffpath)
-    scattering_yxz = np.moveaxis(scattering_yxz, 0, -1)  # (z, y, x) -> (r, c, z) = (YXZ)
+    scattering_zyx = tiff.imread(scattering_tiffpath)
+    scattering_yxz = np.moveaxis(scattering_zyx, 0, -1)  # move (z, y, x) to (row, col, z) = (YXZ)
     scatt_shape_yxz = scattering_yxz.shape
     print('Loaded Scattering tiff file (dtype: ', scattering_yxz.dtype, ') with shape: ', scatt_shape_yxz)
 
-    # Defines the voxel resolution of the data (old ds388 -> now 6um)
+    # Defines the voxel resolution of the scattering image (old ds388 -> now 6um)
     scatt_ps_yxz = mesh_ps_yxz.copy() if _scatt_already_ds else np.array([6, 6, 6])
 
-    # calculate the ratio between mesh and scatering data
+    # calculate the pixel_size ratio between mesh and scattering data
     mesh2scatt_res_ratio = mesh_ps_yxz / scatt_ps_yxz
 
     print('Resolution of the scattering data (r,c,z)', scatt_ps_yxz, 'um')
@@ -167,12 +167,12 @@ def main(parser):
         print('Scaling scattering channel...')
 
         # downsample the scattering channel down to the mesh resolution
-        scattering_yxz = ndimage.zoom(scattering_yxz, zoom=1 / mesh2scatt_res_ratio, prefilter=False)
+        scattering_yxz = ndimage.zoom(scattering_yxz, zoom=1/mesh2scatt_res_ratio, prefilter=False)
 
         # save it in a new tiff file for the future
-        phantom_ds_filepath = os.path.join(base_path, "phantom_scatt_ds.tif")
+        phantom_ds_filepath = os.path.join(base_path, "scatt_ds.tif")
         tiff.imwrite(phantom_ds_filepath, np.moveaxis(scattering_yxz, -1, 0).astype(np.uint8))
-        print('Scattering channel scaled to the mesh resolution and saved as: phantom_scatt_ds.tif')
+        print('Scattering channel scaled to the mesh resolution and saved as: scatt_ds.tif')
 
     # check dimension
     print(BC.B + 'Checking dimension of data:' + BC.ENDC)

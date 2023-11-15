@@ -205,9 +205,10 @@ def main(parser):
     print('New .lon files are saved as: \n{}.lon '.format(new_lon_filepath))
 
     # ======================== SAVE AS VTK =============================================
-    print(BC.B + "*** Generation of the mesh in VTK format collecting the new .lon file" + BC.ENDC)
-    os.system('cd {0} && meshtool collect -imsh={1} -omsh={2} -fib={2}.lon -ofmt=vtu_bin'.format(
-        os.path.dirname(mesh_basepath), mesh_basename, os.path.basename(new_lon_filepath)))
+    if _vtk is True:
+        print(BC.B + "*** Generation of the mesh in VTK format collecting the new .lon file" + BC.ENDC)
+        os.system('cd {0} && meshtool collect -imsh={1} -omsh={2} -fib={2}.lon -ofmt=vtu_bin'.format(
+            os.path.dirname(mesh_basepath), mesh_basename, os.path.basename(new_lon_filepath)))
 
     # =============================================== END OF MAIN =========================================
     print(BC.Y + "*** remove_fibers_by_tags.py terminated." + BC.ENDC)

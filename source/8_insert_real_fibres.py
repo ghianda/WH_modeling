@@ -331,7 +331,7 @@ def main(parser):
     real_lon_filename 	= mesh_basepath + '_realfibers'
     sheets_lon_filename = mesh_basepath + '_sheets'
     perp_lon_filename 	= mesh_basepath + '_perp'
-    
+
     # Writes-out mapped lon file
     meshIO.write_lon(lonFilename=real_lon_filename, lon=lon_real)
     meshIO.write_lon(lonFilename=sheets_lon_filename, lon=lon_sheets)
@@ -361,7 +361,7 @@ def main(parser):
         vpts_filepath = mesh_basepath + '.vpts'  # -> ci inserirò le coordinate dei cpts  (posizioni)
 
         # define the reducing factor of points and vectors
-        scale = 100
+        scale = 1
 
         # scale the number of centroids
         scaled_cpts = cpts.loc[0:len(cpts):scale]
@@ -380,8 +380,8 @@ def main(parser):
 
         # Use the z-components as color:
         # [X  Y  Z  V] : X, Y, and Z are the vector components, V the scalar for the color
-        # PAY ATTENTION <------------------- now I simply copied the z component
-        scaled_vec[3] = scaled_vec[2]
+        # PAY ATTENTION <------------------- now I simply copied the Y [axis=1] component
+        scaled_vec[3] = scaled_vec[1]
 
         # save new .vec file
         scaled_vec.to_csv(vec_filepath, sep=' ', header=False, index=False, mode='w')
