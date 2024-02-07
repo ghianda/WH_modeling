@@ -5,8 +5,6 @@ import math
 import meshIO as meshIO
 from datetime import date
 import tifffile as tiff
-from scipy import ndimage
-import subprocess
 
 from skimage.morphology._skeletonize_3d_cy import fill_Euler_LUT
 
@@ -114,19 +112,17 @@ def main(parser):
 
     # collect arguments
     args = parser.parse_args()
-    mesh_basename       = args.mesh_basename
+    mesh_basepath       = args.mesh_basepath
     scattering_tiffpath = args.scattering_path
-    base_path           = args.base_path
     lon_file            = args.lon_file
-    _scatt_already_ds   = args.scatt_already_ds
     _vpts               = args.vpts
     _vtk                = args.vtk
 
-    # directory of mesh files (if None, take the current directory)
-    base_path = base_path if base_path is not None else os.getcwd()
+    # extract meshname folder path
+    mesh_basename = os.path.basename(mesh_basepath)
+    base_path = os.path.dirname(mesh_basepath)
 
-    # compile absolute paths
-    mesh_basepath = os.path.join(base_path, mesh_basename)
+    # compile path of the optional .lon file
     lon_fpath = None if lon_file is None else os.path.join(base_path, lon_file)
 
     print(BC.Y + '*** Modelling Fibrosis on mesh {} by holes in fibers ...'.format(mesh_basename) + BC.ENDC)
@@ -142,44 +138,24 @@ def main(parser):
     # loading mesh in carp format
     pts, elem, lon, cpts = read_carp_mesh(mesh_basepath, lon_fpath=lon_fpath, _read_cpts=True, _verb=True)
 
-    # defines pixel size of the mesh (from the segmented image)
-    mesh_ps_yxz = np.array([20, 20, 20])  # um
-    print('Resolution of the mesh (r,c,z)', mesh_ps_yxz, 'um')
-
     # load scattering tiff
     scattering_zyx = tiff.imread(scattering_tiffpath)
     scattering_yxz = np.moveaxis(scattering_zyx, 0, -1)  # move (z, y, x) to (row, col, z) = (YXZ)
     scatt_shape_yxz = scattering_yxz.shape
     print('Loaded Scattering tiff file (dtype: ', scattering_yxz.dtype, ') with shape: ', scatt_shape_yxz)
 
-    # Defines the voxel resolution of the scattering image (old ds388 -> now 6um)
-    scatt_ps_yxz = mesh_ps_yxz.copy() if _scatt_already_ds else np.array([6, 6, 6])
-
-    # calculate the pixel_size ratio between mesh and scattering data
-    mesh2scatt_res_ratio = mesh_ps_yxz / scatt_ps_yxz
+    # defines pixel sizes
+    # the points in the mesh are already "scaled" with the pixel size of segmentation (20um) - no need rescaling
+    mesh_ps_yxz = np.array([1, 1, 1])  # [um] -> points anc cpts values are already in um
+    scatt_ps_yxz = np.array([20, 20, 20])
 
     print('Resolution of the scattering data (r,c,z)', scatt_ps_yxz, 'um')
-    print('Ration between mesh and scattering pixel size: ', mesh2scatt_res_ratio)
-
-    if _scatt_already_ds:
-        print('Scattering channel is already scaled to the mesh spatial resolution.')
-    else:
-        print('Scaling scattering channel...')
-
-        # downsample the scattering channel down to the mesh resolution
-        scattering_yxz = ndimage.zoom(scattering_yxz, zoom=1/mesh2scatt_res_ratio, prefilter=False)
-
-        # save it in a new tiff file for the future
-        phantom_ds_filepath = os.path.join(base_path, "scatt_ds.tif")
-        tiff.imwrite(phantom_ds_filepath, np.moveaxis(scattering_yxz, -1, 0).astype(np.uint8))
-        print('Scattering channel scaled to the mesh resolution and saved as: scatt_ds.tif')
 
     # check dimension
     print(BC.B + 'Checking dimension of data:' + BC.ENDC)
-    print('PIXEL - Shape of Scattering data (YXZ): ', scatt_shape_yxz)
-    print('PIXEL - Max coordinates of centroids (XYZ): ', np.array(cpts.max()))
-    print('UM - Shape of Scattering data (YXZ) in um: ', scatt_shape_yxz * scatt_ps_yxz)
-    print('UM - Max coordinates of centroids (XYZ) in um: \n', mesh_ps_yxz * cpts.max(), BC.ENDC)
+    print('PIXEL - Shape of Scattering data (YXZ) in px: ', scatt_shape_yxz)
+    print('UM    - Shape of Scattering data (YXZ) in um: ', scatt_shape_yxz * scatt_ps_yxz)
+    print('CPTS  - Max coordinates of centroids (XYZ)  : ', np.array(cpts.max()))
 
 
     # ================================  PRE-ITERATION OPERATIONS  ==========================================
@@ -202,7 +178,7 @@ def main(parser):
 
     print(BC.B + 'Start simulating fibrotic areas inside the new .lon file... ' + BC.ENDC)
 
-    # ================================  COMPILE NEW .LON FILES  ==========================================
+    # =======================  COMPILE NEW .LON FILES MAPPING SCATTERING VALUES  ==========================
     print("Progress:")
     for i in range(n_points):
         # print progress percent
@@ -217,10 +193,12 @@ def main(parser):
                 # diffuse fibrosis -> remove fiber accordingly with scattering signal
                 diffuse_fib_elem = diffuse_fib_elem + 1  # counter
 
-                # Sees which voxel we're in
-                x, y, z = np.floor(cpts.loc[i, 0]), np.floor(cpts.loc[i, 1]), np.floor(cpts.loc[i, 2])
+                # Sees which voxel we're in (in the scattering-image's pixel size)
+                x = np.floor(cpts.loc[i, 0] / scatt_ps_yxz[0])
+                y = np.floor(cpts.loc[i, 1] / scatt_ps_yxz[1])
+                z = np.floor(cpts.loc[i, 2] / scatt_ps_yxz[2])
 
-                # read scattering signal in that position
+                # read scattering signal in that position (in pixel)
                 scatt_ldg = scattering_yxz[int(y), int(x), int(z)]
 
                 if current_elem_is_fibrosis(scatt_ldg, df_scatt_lvls):
@@ -234,7 +212,7 @@ def main(parser):
                 compact_fib_elem = compact_fib_elem + 1  # counter
 
             if current_tag == 7:
-                # vessels -> remove fiber
+                # vessels or empty space in segmentation -> remove fiber
                 lon_fibrosis.loc[i] = empty_fiber
                 vessels_elem = vessels_elem + 1  # counter
 
@@ -279,7 +257,7 @@ def main(parser):
 
     # ================================  SAVE NEW .LON FILES  ==========================================
 
-    fibrosis_lon_filepath = mesh_basepath + '_fibrosis'
+    fibrosis_lon_filepath = mesh_basepath + '_DiffFibr'  # DF: diffuse fibrosis
     meshIO.write_lon(lonFilename=fibrosis_lon_filepath, lon=lon_fibrosis)
 
     # print and write output locations
@@ -299,11 +277,12 @@ def main(parser):
     if _vpts:
         print(BC.B + ' *** Generation of .vpts and .vec file for visualization...' + BC.ENDC)
         # define new filenames of .vec and .vpts
-        vec_filepath = mesh_basepath + '_fibrosis.vec'  # -> ci inserirò le componenti dei vettori (componenti)
-        vpts_filepath = mesh_basepath + '_fibrosis.vpts'  # -> ci inserirò le coordinate dei cpts  (posizioni)
+        vec_filepath = fibrosis_lon_filepath + '.vec'
+        vpts_filepath = fibrosis_lon_filepath + '.vpts'
 
         # define the reducing factor of points and vectors
-        scale = 100
+        # scale = 100
+        scale = 1
 
         # scale the number of centroids
         scaled_cpts = cpts.loc[0:len(cpts):scale]
@@ -320,19 +299,20 @@ def main(parser):
         scaled_vec = lon_fibrosis.loc[0:len(lon_fibrosis):scale].copy()
         print('Selected {} fibers vectors from {} total'.format(len(scaled_vec), len(lon_fibrosis)))
 
-        # Use the z-components as color:
+        # Use the Y-components as color:
         # [X  Y  Z  V] : X, Y, and Z are the vector components, V the scalar for the color
         # PAY ATTENTION <------------------- now I simply copied the z component
-        scaled_vec[3] = scaled_vec[2]
+        scaled_vec[3] = scaled_vec[1]
 
         # save new .vec file
         scaled_vec.to_csv(vec_filepath, sep=' ', header=False, index=False, mode='w')
         print('Saved selected fibres in:\n -', vec_filepath)
 
     # ======================== SAVE AS VTK =============================================
-    print(BC.B + "*** Generation of the mesh in VTK format collecting the new fibrosis.lon file" + BC.ENDC)
-    os.system('cd {0} && meshtool collect -imsh={1} -omsh={1}_fibrosis -fib={1}_fibrosis.lon -ofmt=vtu_bin'.format(
-        base_path, mesh_basename))
+    if _vtk:
+        print(BC.B + "*** Generation of the mesh in VTK format collecting the new fibrosis.lon file" + BC.ENDC)
+        os.system('cd {0} && meshtool collect -imsh={1} -omsh={2} -fib={2}.lon -ofmt=vtu_bin'.format(
+            base_path, mesh_basename, fibrosis_lon_filepath))
 
     # =============================================== END OF MAIN =========================================
     print(BC.Y + "*** hole_fibrosis_by_scattering.py terminated." + BC.ENDC)
@@ -344,30 +324,19 @@ if __name__ == '__main__':
                                                     'percentage of fibers in elements with tag 5 accordingly '
                                                     'with the intensity of the scattering signal.')
     my_parser.add_argument('-msh',
-                           '--mesh-basename',
-                           help='mesh basename',
+                           '--mesh-basepath',
+                           help='Complete path to the mesh basename (carp format, no extension',
                            required=True)
     my_parser.add_argument('-scatt',
                            '--scattering-path',
                            help='Path of .tiff file of scattering channel of the sample ',
                            required=True)
-    my_parser.add_argument('-meshpath',
-                           '--base-path',
-                           help='pass the folder path of mesh files if files are not in the current directory',
-                           required=False,
-                           default=None)
     my_parser.add_argument('-fib',
                            '--lon-file',
                            help='Filename of the .lon file to read. \n'
                                 'If passed, the script use this fibers as input instead the default file.',
                            required=False,
                            default=None)
-    my_parser.add_argument('-ds',
-                           action='store_true',
-                           default=False,
-                           dest='scatt_already_ds',
-                           help='Add \'-ds\' if the scattering-path refer to a tiff file \n'
-                                'already downsampled down the mesh resolution.')
     my_parser.add_argument('-vpts',
                            action='store_true',
                            default=True,
