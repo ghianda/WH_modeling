@@ -198,11 +198,13 @@ def main(parser):
 
     # ================================  SAVE NEW .LON FILES  ==========================================
 
-    new_lon_filepath = mesh_basepath + '_nofiber_tags_' + '-'.join(map(str, tags))
+    orig_lon_filename = os.path.splitext(os.path.basename(lon_fpath))[0]
+    new_lon_filename = orig_lon_filename + '_nofiber_tags_' + '-'.join(map(str, tags))
+    new_lon_filepath = os.path.join(os.path.dirname(mesh_basepath), new_lon_filename)
     meshIO.write_lon(lonFilename=new_lon_filepath, lon=lon_modified)
 
     # print and write output locations
-    print('New .lon files are saved as: \n{}.lon '.format(new_lon_filepath))
+    print('New .lon files are saved in: \n{}.lon '.format(new_lon_filepath))
 
     # ======================== SAVE AS VTK =============================================
     if _vtk is True:
