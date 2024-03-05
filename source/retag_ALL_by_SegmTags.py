@@ -27,18 +27,11 @@ from scipy import ndimage
 ==============================================================='''
 
 # HARDCODED TAGS: change here if the tiff has different values:
-class BC:
-    VERB = '\033[95m'
-    B = '\033[94m'
-    G = '\033[92m'
-    Y = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-
-MYO_tag = 1
-NCF_tag = 5
+class TAG:
+    MYO  = 1
+    NCF  = 5
+    CF   = 6
+    VESS = 7
 
 class BC:
     VERB = '\033[95m'
@@ -152,17 +145,16 @@ def main(parser):
 
     # defines pixel sizes
     # the points in the mesh are already "scaled" with the pixel size of segmentation (20um) - no need rescaling
-    scatt_ps_yxz = np.array([20, 20, 20])
-    print('Resolution of the scattering data (r,c,z)', scatt_ps_yxz, 'um')
+    tiff_ps_yxz = np.array([20, 20, 20])
+    print('Resolution of the tagged tiff data (r,c,z)', tiff_ps_yxz, 'um')
 
     # check dimension
     print(BC.B + 'Checking dimension of data:' + BC.ENDC)
-    print('PIXEL - Shape of Scattering data (YXZ) in px: ', tags_tiff_shape_yxz)
-    print('UM    - Shape of Scattering data (YXZ) in um: ', tags_tiff_shape_yxz * scatt_ps_yxz)
-    print('CPTS  - Max coordinates of centroids (XYZ)  : ', np.array(cpts.max()))
+    print('PIXEL - Shape of tagged tiff data (Y-X-Z) in px: ', tags_tiff_shape_yxz)
+    print('UM    - Shape of tagged tiff data (Y-X-Z) in um: ', tags_tiff_shape_yxz * tiff_ps_yxz)
+    print('CPTS  - Max coordinates of mesh centroids (X-Y-Z)  : ', np.array(cpts.max()))
 
     # ================================  PRE-ITERATION OPERATIONS  ==========================================
-
 
     # supports
     n_elements    = len(elem)
@@ -175,42 +167,40 @@ def main(parser):
     # just for debugging
     stringlist_elements_retagged = list()
 
-    # tag(s) to be replaced:
-    print(BC.B + 'Tag to be replaced: ' + BC.ENDC, NCF_tag)
-    print(BC.B + 'New tag value if scattering < 6: ' + BC.ENDC, MYO_tag)
     print(BC.B + 'Start retagging elements in the .elem file... ' + BC.ENDC)
 
     # ================================  COMPILE NEW .ELEM FILES  ==========================================
     print("Progress:")
     for i in range(n_elements):
-        # print progress percent
-        if i % 10**(magn - 1) == 0:
-            print(' - {0:3.0f} %'.format(100 * i / n_elements))
 
         # read tag of current element
         current_tag = elem.loc[i, 5]
 
         try:
-            if current_tag == NCF_tag:
+            # Sees which voxel we're in (in the tagged_tiff image's pixel size)
+            x = np.floor(cpts.loc[i, 0] / tiff_ps_yxz[0])
+            y = np.floor(cpts.loc[i, 1] / tiff_ps_yxz[1])
+            z = np.floor(cpts.loc[i, 2] / tiff_ps_yxz[2])
 
-                # Sees which voxel we're in (in the scattering-image's pixel size)
-                x = np.floor(cpts.loc[i, 0] / scatt_ps_yxz[0])
-                y = np.floor(cpts.loc[i, 1] / scatt_ps_yxz[1])
-                z = np.floor(cpts.loc[i, 2] / scatt_ps_yxz[2])
+            # read scattering signal in that position (in pixel)
+            tiff_ldg = tags_tiff_yxz[int(y), int(x), int(z)]
 
-                # read scattering signal in that position (in pixel)
-                scatt_ldg = tags_tiff_yxz[int(y), int(x), int(z)]
+            # HERE, I want to retag ALL elements, I can use directly the tiff_ldg as the new tag
+            elem_retagged.loc[i, 5] = tiff_ldg  #
 
-                if scatt_ldg < 6:
-                    # elements is MYO, not Diffuse Fibrosis: change the tag
-                    elem_retagged.loc[i, 5] = MYO_tag
+            # increase the counter - CAN BE DELETED IF IT WORKS
+            n_elements_retagged = n_elements_retagged + 1  # counter
 
-                    # increase the counter
-                    n_elements_retagged = n_elements_retagged + 1  # counter
-
-                    # just for debugging
-                    stringlist_elements_retagged.append('elem={0}; tag={1}; scatt={2} ->> rettaged with {3}'.format(
-                        i, current_tag, scatt_ldg, MYO_tag))
+            # OLD APPROACH with IF: ---------------
+            # if tiff_ldg == TAG.MYO:
+            #     elem_retagged.loc[i, 5] = TAG.MYO
+            #
+            #     # increase the counter
+            #     n_elements_retagged = n_elements_retagged + 1  # counter
+            #
+            #     # just for debugging
+            #     stringlist_elements_retagged.append('elem={0}; tag={1}; scatt={2} ->> rettaged with {3}'.format(
+            #         i, current_tag, tiff_ldg, MYO_tag))
 
         except ValueError as e:
             print(BC.FAIL)
@@ -224,10 +214,18 @@ def main(parser):
             print(BC.ENDC)
             exception = exception + 1
 
+        # print progress percent and debugging info
+        if i % 10 ** (magn - 1) == 0:
+            print(' - {0:3.0f} %'.format(100 * i / n_elements))
+
+            # just for debugging
+            stringlist_elements_retagged.append('elem={0}; tag={1}; tiff={2} ->> rettaged with {2}'.format(
+                i, current_tag, tiff_ldg))
+
     print(BC.B + 'Terminated.' + BC.ENDC)
 
     # for debugging: compile the list of elements retagged:
-    txt_elements_fpath = os.path.join(base_path, "List_of_elements_retagged.txt")
+    txt_elements_fpath = os.path.join(base_path, "List_of_elements_retagged_by_tagged_tiff.txt")
     with open(txt_elements_fpath, "w") as flist:
         print("Execution date: \n\n", date.today(), file=flist)
         for l in stringlist_elements_retagged:
@@ -268,10 +266,10 @@ def main(parser):
     if _vtk:
         print(BC.B + "*** Generation of the mesh in VTK format collecting the new .elem file" + BC.ENDC)
         os.system('cd {0} && meshtool convert -imsh={1} -ifmt=carp_txt '
-                  '-omsh={1}_rettaged_as_{2}.vtk -ofmt=vtk_bin'.format(base_path, mesh_basename, NCF_tag))
+                  '-omsh={1}_ALL_rettaged.vtk -ofmt=vtk_bin'.format(base_path, mesh_basename))
 
     # =============================================== END OF MAIN =========================================
-    print(BC.Y + "*** retag.py terminated." + BC.ENDC)
+    print(BC.Y + "*** retag_ALL_by_SegmTags.py terminated." + BC.ENDC)
 
 
 if __name__ == '__main__':
